@@ -1,0 +1,22 @@
+select a.Guid, vi.name [Connection Profile], b.Count [Computer Count], c.Count [Credential Count]
+
+from (
+select ic.Guid
+from Class c1
+left join ItemClass ic on ic.ClassGuid = c1.Guid
+where c1.Type = 'Altiris.PluggableProtocols.ConnectionProfileItem'
+) a
+
+left join vItem vi on vi.Guid = a.Guid
+left join (
+select acpm.ConnectionProfileGuid [Guid], count(*) [Count]
+from Inv_Altris_Common_ProtocolMask acpm
+group by acpm.ConnectionProfileGuid
+) b on b.Guid = a.guid
+
+left join (
+select ir.ParentItemGuid [Guid], count(*) [Count]
+from ItemReference ir
+where ir.Hint = 'protocolsettings'
+group by ir.ParentItemGuid
+) c on c.Guid = a.Guid
