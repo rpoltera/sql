@@ -1,0 +1,39 @@
+
+Policy execution
+select
+a.name as 'Computer Name',
+a.Domain,
+v2.Name as [Task Server],
+b.packagename as 'File Name',
+b.advertisementname as 'Policy Name',
+convert(varchar, b.Start ,100) as 'Start Time',
+convert(varchar, b.[end] ,100) as 'End Time',
+
+case
+--// common exit codes
+when b.ReturnCode = '0' then 'Instalation Complete'--// known exit code for installed
+when b.ReturnCode = '3010' then 'Reboot Pending' --// known exit code for reboot pending
+when b.ReturnCode = '1639' then 'Invalid command line'--//Invalid command line
+when b.ReturnCode = '1638' then 'Another version of this product is already installed'
+when b.ReturnCode = '1636' then 'This patch package could not be opened'
+when b.ReturnCode = '1634' then 'Component not used on this computer'
+when b.ReturnCode = '1633' then 'This installation package is not supported on this platform'
+when b.ReturnCode = '1631' then 'The Windows Installer service failed to start'
+when b.ReturnCode = '1603' then 'Fatal error during installation'
+when b.ReturnCode = '1602' then 'User cancel installation'
+
+else 'Failed Install'
+End as 'Install Status'
+from dbo.Inv_AeX_AC_Identification a
+join dbo.Evt_AeX_SWD_Execution b
+on a._resourceguid = b._resourceguid
+join vComputer v1
+on v1.Guid=a._ResourceGuid
+left outer join Inv_Client_Task_Resources
+on v1.Guid = Inv_Client_Task_Resources._ResourceGuid
+left outer join vComputer v2
+on Inv_Client_Task_Resources.ClientTaskServerGuid = v2.Guid
+
+where b.[End] > GetDate () -31
+--and a.name like '%smp%' --// this is to look up a computer easily
+Order by a.Name, b.[End] desc
