@@ -1,0 +1,47 @@
+declare @Filter as uniqueidentifier--Define the variable with the @VariableName 
+set @Filter = 
+--'036E2BD3-4E10-4C23-B262-9A6B128A597F'
+'EB3A1A12-E1C7-4431-B060-F0333E4E488C'
+
+select 
+       c.Name as 'Computer Name'
+      ,sb.Name + ': ' + su.Name as 'Bulletin: Update'
+      ,ISNULL (su.SeverityName, sb.Severity) as 'Severity' 
+      ,case
+            when isu._ResourceGuid is not null then 'Installed'
+            when isu._ResourceGuid is null then 'Vulnerable'
+            else 'Unknown'
+      end as 'IsInstalled'
+      ,case 
+            when sb.Enabled = 1 then 'True'
+            when sb.Enabled = 0 then 'False'
+            else 'Unknown'
+      end as 'Downloaded'
+      ,ci.Name as 'Vendor'
+from vRM_Computer_Item c--vcomputer--This is the computer, used for its guid and name
+join Inv_Applicable_Windows_Software_Update asu--Get updates applicable to each computer
+      on asu._ResourceGuid = c.Guid
+left join Inv_Installed_Windows_Software_Update isu 
+      on isu._ResourceGuid = asu._ResourceGuid
+            and isu.SoftwareUpdateGuid = asu.SoftwareUpdateGuid
+join ResourceAssociation bul2su --Gets us from the update to the bulletin via its ResourceAssociation
+      on bul2su.ChildResourceGuid = asu.SoftwareUpdateGuid
+            and bul2su.ResourceAssociationTypeGuid = '7EEAB03A-839C-458D-9AF2-55DB6B173293'--Software Bulletin To Software Update
+join vPMCore_SoftwareBulletin sb --Used to get the name, severity and Enabled status of the bulletin
+      on sb.Guid = bul2su.ParentResourceGuid
+join vPMCore_SoftwareUpdate su --Used to get the name and severity of the update
+      on su._ResourceGuid = asu.SoftwareUpdateGuid
+left join ResourceAssociation super 
+      on super.ParentResourceGuid = asu.SoftwareUpdateGuid
+            and super.ResourceAssociationTypeGuid = '644A995E-211A-4D94-AA8A-788413B7BE5D'--Software Component Supersedes Software Component
+join CollectionMembership cm--Tables used for the filter parameter
+      on cm.ResourceGuid = c.Guid
+      and cm.CollectionGuid = @Filter
+join ResourceAssociation bul2vend--Used to get the link from the bulletin to vendor
+      on bul2vend. ParentResourceGuid = sb.Guid
+            and bul2vend.ResourceAssociationTypeGuid = '2FFEB9F0-601E-4746-A830-BDB200076503'--Software Bulletin To Vendor
+join vRM_Company_Item ci on ci.Guid = bul2vend.ChildResourceGuid--Used to get the name of the vendor
+where super.ChildResourceGuid is null     --Exludes all superseded updates, not targetable by Patch
+
+      
+
